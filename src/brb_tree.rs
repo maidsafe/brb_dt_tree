@@ -39,10 +39,16 @@ impl<ID: TreeId + Debug, M: TreeMeta + Clone + Eq + Debug + Hash + Serialize> BR
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Validation {
+    SourceNotSameAsOperator { source: Actor, op_actor: Actor }
+}
+
 impl<ID: TreeId + Debug + Serialize, M: TreeMeta + Clone + Eq + Debug + Hash + Serialize>
     BRBDataType for BRBTree<ID, M>
 {
     type Op = OpMove<ID, M, Actor>;
+    type Validation = Validation;
 
     /// Create a new BRBTree
     fn new(actor: Actor) -> Self {
@@ -53,14 +59,11 @@ impl<ID: TreeId + Debug + Serialize, M: TreeMeta + Clone + Eq + Debug + Hash + S
     }
 
     /// Validate an operation.
-    fn validate(&self, from: &Actor, op: &Self::Op) -> bool {
-        if op.timestamp().actor_id() != from {
-            println!(
-                "[TREE/INVALID] Attempting to add with an actor different from the source proc"
-            );
-            false
+    fn validate(&self, source: &Actor, op: &Self::Op) -> Result<(), Self::Validation> {
+        if op.timestamp().actor_id() != source {
+	    Err(Validation::SourceNotSameAsOperator { source: *source, op_actor: *op.timestamp().actor_id() })
         } else {
-            true
+	    Ok(())
         }
     }
 
