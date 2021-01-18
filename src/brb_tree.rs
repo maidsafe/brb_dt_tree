@@ -1,6 +1,6 @@
 use crdt_tree::{Clock, OpMove, State, TreeId, TreeMeta};
 
-use brb::{Actor, BRBDataType};
+use brb::BRBDataType;
 
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
@@ -11,47 +11,44 @@ use std::{fmt::Debug, hash::Hash};
 /// using Byzantine Reliable Broadcast.
 
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
-pub struct BRBTree<ID: TreeId, M: TreeMeta + Clone + Eq + Debug + Hash + Serialize> {
-    actor: Actor,
-    treestate: State<ID, M, Actor>,
+pub struct BRBTree<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> {
+    actor: A,
+    treestate: State<ID, M, A>,
 }
 
-impl<ID: TreeId + Debug, M: TreeMeta + Clone + Eq + Debug + Hash + Serialize> BRBTree<ID, M> {
+impl<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> BRBTree<A, ID, M> {
     /// generates a move operation.  (crdt_tree::OpMove)
-    pub fn opmove(
-        &self,
-        clock: Clock<Actor>,
-        parent: ID,
-        meta: M,
-        child: ID,
-    ) -> OpMove<ID, M, Actor> {
+    pub fn opmove(&self, clock: Clock<A>, parent: ID, meta: M, child: ID) -> OpMove<ID, M, A> {
         OpMove::new(clock, parent, meta, child)
     }
 
     /// returns the actor
-    pub fn actor(&self) -> &Actor {
+    pub fn actor(&self) -> &A {
         &self.actor
     }
 
     /// returns underlying crdt_tree::State object
-    pub fn treestate(&self) -> &State<ID, M, Actor> {
+    pub fn treestate(&self) -> &State<ID, M, A> {
         &self.treestate
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ValidationError {
-    SourceNotSameAsOperator { source: Actor, op_actor: Actor },
+pub enum ValidationError<A> {
+    SourceNotSameAsOperator { source: A, op_actor: A },
 }
 
-impl<ID: TreeId + Debug + Serialize, M: TreeMeta + Clone + Eq + Debug + Hash + Serialize>
-    BRBDataType for BRBTree<ID, M>
+impl<
+        A: Hash + Ord + Clone + Debug + Serialize + 'static,
+        ID: TreeId + Debug + Serialize,
+        M: TreeMeta + Eq + Debug + Hash + Serialize,
+    > BRBDataType<A> for BRBTree<A, ID, M>
 {
-    type Op = OpMove<ID, M, Actor>;
-    type ValidationError = ValidationError;
+    type Op = OpMove<ID, M, A>;
+    type ValidationError = ValidationError<A>;
 
     /// Create a new BRBTree
-    fn new(actor: Actor) -> Self {
+    fn new(actor: A) -> Self {
         BRBTree {
             actor,
             treestate: State::new(),
@@ -59,11 +56,11 @@ impl<ID: TreeId + Debug + Serialize, M: TreeMeta + Clone + Eq + Debug + Hash + S
     }
 
     /// Validate an operation.
-    fn validate(&self, source: &Actor, op: &Self::Op) -> Result<(), Self::ValidationError> {
+    fn validate(&self, source: &A, op: &Self::Op) -> Result<(), Self::ValidationError> {
         if op.timestamp().actor_id() != source {
             Err(ValidationError::SourceNotSameAsOperator {
-                source: *source,
-                op_actor: *op.timestamp().actor_id(),
+                source: source.clone(),
+                op_actor: op.timestamp().actor_id().clone(),
             })
         } else {
             Ok(())

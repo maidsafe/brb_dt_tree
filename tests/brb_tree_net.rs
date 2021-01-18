@@ -5,10 +5,11 @@ mod tests {
     use crdt_tree::{Clock, OpMove, State, Tree, TreeNode};
     use quickcheck::{self, TestResult};
 
-    use brb::{Actor, Error, MembershipError, Net, Packet};
+    use brb::net::{Actor, Net};
+    use brb::{Error, MembershipError, Packet};
     use brb_dt_tree::BRBTree;
 
-    type TestTree = BRBTree<u8, String>;
+    type TestTree = BRBTree<Actor, u8, String>;
 
     fn bootstrap_net(net: &mut Net<TestTree>, n_procs: u8) {
         let genesis_actor = net.initialize_proc();
@@ -231,7 +232,7 @@ mod tests {
             let genesis_actor = net.initialize_proc();
             net.on_proc_mut(&genesis_actor, |p| p.force_join(genesis_actor)).unwrap();
 
-            let mut packet_queues: BTreeMap<(Actor, Actor), Vec<Packet<_>>> = Default::default();
+            let mut packet_queues: BTreeMap<(Actor, Actor), Vec<Packet<_, _, _>>> = Default::default();
             let mut model: State<u8, String, Actor> = Default::default();
             let mut clocks_model: HashMap<Actor, Clock<Actor>> = Default::default();
             let mut clocks_net: HashMap<Actor, Clock<Actor>> = Default::default();
