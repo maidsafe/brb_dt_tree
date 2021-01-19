@@ -1,17 +1,20 @@
 [package]
 name = "brb_dt_tree"
 version = "0.1.0"
+description = "implements a BRBDataType wrapper around a Tree CRDT"
 authors = ["dan-da <dan-da@users.noreply.github.com>"]
-edition = "2018"
 license = "MIT OR BSD-3-Clause"
+repository = "https://github.com/maidsafe/brb_dt_tree"
+edition = "2018"
+
 
 [dependencies]
-crdt_tree = "0.0.7"
-brb = { git = "https://github.com/maidsafe/brb.git", branch="master" }
-serde = "1.0.106"
+crdt_tree = "0.0.8"
+brb = "1.0.1"
+serde = "1.0.120"
 
 [dev-dependencies]
-quickcheck = "0.9"
+quickcheck = "1.0.3"
 
 [profile.test]
 # Property testing is a power hungry beast, we need to go as fast as we can
