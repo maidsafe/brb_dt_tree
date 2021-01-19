@@ -5,7 +5,7 @@
 
 ## About
 
-This crates implements a BRBDataType wrapper around a Tree CRDT.
+This crate implements a BRBDataType wrapper around a Tree CRDT.
 
 This enables Tree operations to be transmitted in a BFT manner using Byzantine Reliable Broadcast.
 
