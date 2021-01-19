@@ -134,11 +134,11 @@ mod tests {
 
     quickcheck::quickcheck! {
         fn prop_ops_show_up_on_read(n_procs: u8, members: Vec<u8>) -> TestResult {
-            if n_procs == 0 || n_procs > 7 || members.len() > 10 {
+            let root_id = 255;
+            if n_procs == 0 || n_procs > 7 || members.len() > 10 || members.contains(&root_id) {
                 return TestResult::discard();
             }
 
-            let root_id = 255;
             let mut clocks: HashMap<Actor, Clock<Actor>> = Default::default();
 
             let mut net: Net<TestTree> = Net::new();
@@ -184,11 +184,10 @@ mod tests {
 
 
         fn prop_ops_behave_as_tree(n_procs: u8, members: Vec<u8>) -> TestResult {
-            if n_procs == 0 || n_procs > 7 || members.len() > 10 {
+            let root_id = 255;
+            if n_procs == 0 || n_procs > 7 || members.len() > 10 || members.contains(&root_id) {
                 return TestResult::discard();
             }
-
-            let root_id = 255;
 
             let mut net: Net<TestTree> = Net::new();
             bootstrap_net(&mut net, n_procs);
