@@ -4,6 +4,7 @@ use brb::BRBDataType;
 
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
+use thiserror::Error;
 
 /// BRBTRee is a BRBDataType wrapper around a Tree CRDT. (crdt_tree)
 ///
@@ -33,9 +34,10 @@ impl<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> BRBTree<A, ID, M> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ValidationError<A> {
-    SourceNotSameAsOperator { source: A, op_actor: A },
+#[derive(Error, Debug, PartialEq, Eq)]
+pub enum ValidationError {
+    #[error("The source actor does not match the actor associated with the operation")]
+    SourceDoesNotMatchOp,
 }
 
 impl<
@@ -45,7 +47,7 @@ impl<
     > BRBDataType<A> for BRBTree<A, ID, M>
 {
     type Op = OpMove<ID, M, A>;
-    type ValidationError = ValidationError<A>;
+    type ValidationError = ValidationError;
 
     /// Create a new BRBTree
     fn new(actor: A) -> Self {
@@ -58,10 +60,7 @@ impl<
     /// Validate an operation.
     fn validate(&self, source: &A, op: &Self::Op) -> Result<(), Self::ValidationError> {
         if op.timestamp().actor_id() != source {
-            Err(ValidationError::SourceNotSameAsOperator {
-                source: source.clone(),
-                op_actor: op.timestamp().actor_id().clone(),
-            })
+            Err(ValidationError::SourceDoesNotMatchOp)
         } else {
             Ok(())
         }
