@@ -9,8 +9,9 @@ edition = "2018"
 
 [dependencies]
 crdt_tree = "0.0.8"
-brb = "1.0.1"
+brb = "1.0.2"
 serde = "1.0.120"
+thiserror = "1.0.23"
 
 [dev-dependencies]
 quickcheck = "1.0.3"
