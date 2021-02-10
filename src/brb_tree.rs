@@ -7,7 +7,7 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use crdt_tree::{Clock, OpMove, State, TreeId, TreeMeta};
+use crdt_tree::{OpMove, State, TreeId, TreeMeta, TreeReplica};
 
 use brb::BRBDataType;
 
@@ -17,15 +17,15 @@ use thiserror::Error;
 
 /// A BRBDataType wrapper around crdt_tree::State
 #[derive(Debug, Serialize, PartialEq, Eq, Clone)]
-pub struct BRBTree<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> {
+pub struct BRBTree<A: Clone + Hash + Ord + Debug, ID: TreeId, M: TreeMeta> {
     actor: A,
-    treestate: State<ID, M, A>,
+    treereplica: TreeReplica<ID, M, A>,
 }
 
-impl<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> BRBTree<A, ID, M> {
+impl<A: Clone + Hash + Ord + Debug, ID: TreeId, M: TreeMeta> BRBTree<A, ID, M> {
     /// generates a move operation.  (crdt_tree::OpMove)
-    pub fn opmove(&self, clock: Clock<A>, parent: ID, meta: M, child: ID) -> OpMove<ID, M, A> {
-        OpMove::new(clock, parent, meta, child)
+    pub fn opmove(&self, parent: ID, meta: M, child: ID) -> OpMove<ID, M, A> {
+        self.treereplica.opmove(parent, meta, child)
     }
 
     /// returns the actor
@@ -35,7 +35,12 @@ impl<A: Clone + Hash + Ord, ID: TreeId, M: TreeMeta> BRBTree<A, ID, M> {
 
     /// returns underlying crdt_tree::State object
     pub fn treestate(&self) -> &State<ID, M, A> {
-        &self.treestate
+        &self.treereplica.state()
+    }
+
+    /// returns underlying crdt_tree::State object
+    pub fn treereplica(&self) -> &TreeReplica<ID, M, A> {
+        &self.treereplica
     }
 }
 
@@ -58,8 +63,8 @@ impl<
     /// Create a new BRBTree
     fn new(actor: A) -> Self {
         BRBTree {
-            actor,
-            treestate: State::new(),
+            actor: actor.clone(),
+            treereplica: TreeReplica::new(actor),
         }
     }
 
@@ -74,6 +79,6 @@ impl<
 
     /// Apply an operation to the underlying Tree datatype
     fn apply(&mut self, op: Self::Op) {
-        self.treestate.apply_op(op);
+        self.treereplica.apply_op(op);
     }
 }
