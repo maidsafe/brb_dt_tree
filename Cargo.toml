@@ -8,9 +8,9 @@ repository = "https://github.com/maidsafe/brb_dt_tree"
 edition = "2018"
 
 [dependencies]
-crdt_tree = "0.0.8"
-brb = "1.0.2"
-serde = "1.0.120"
+crdt_tree = "0.0.12"
+brb = "1.0.4"
+serde = "1.0.123"
 thiserror = "1.0.23"
 
 [dev-dependencies]

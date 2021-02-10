@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap, HashSet};
+    use std::collections::{BTreeMap, HashSet};
 
-    use crdt_tree::{Clock, OpMove, State, Tree, TreeNode};
+    use crdt_tree::{Tree, TreeNode, TreeReplica};
     use quickcheck::{self, TestResult};
 
     use brb::net::{Actor, Net};
@@ -36,18 +36,14 @@ mod tests {
         let mut net = Net::new();
         bootstrap_net(&mut net, 1);
         let actor = net.members().into_iter().next().unwrap();
-        let mut clock: Clock<Actor> = Clock::<Actor>::new(actor, None);
 
         let root_id = 255;
 
         // Initiate the signing round DSB but don't deliver signatures
         let pending_packets = net
             .on_proc(&actor, |proc| {
-                proc.exec_op(
-                    proc.dt
-                        .opmove(clock.tick(), root_id, "Hello".to_string(), 1),
-                )
-                .unwrap()
+                proc.exec_op(proc.dt.opmove(root_id, "Hello".to_string(), 1))
+                    .unwrap()
             })
             .unwrap()
             .into_iter()
@@ -57,11 +53,8 @@ mod tests {
         // Initiate the signing round again but for a different op (adding World instead of Hello)
         let invalid_pending_packets_cnt = net
             .on_proc(&actor, |proc| {
-                proc.exec_op(
-                    proc.dt
-                        .opmove(clock.tick(), root_id, "World".to_string(), 2),
-                )
-                .unwrap()
+                proc.exec_op(proc.dt.opmove(root_id, "World".to_string(), 2))
+                    .unwrap()
             })
             .unwrap()
             .into_iter()
@@ -91,7 +84,6 @@ mod tests {
             members.next().unwrap(),
             members.next().unwrap(),
         );
-        let mut clock_a: Clock<Actor> = Clock::<Actor>::new(a, None);
 
         // let value_to_add = 32;
         let root_id = 255;
@@ -100,7 +92,7 @@ mod tests {
         // initiating process 'a' broadcasts requests for validation
         let req_for_valid_packets = net
             .on_proc(&a, |p| {
-                p.exec_op(p.dt.opmove(clock_a.tick(), root_id, "32".to_string(), child_id))
+                p.exec_op(p.dt.opmove(root_id, "32".to_string(), child_id))
                     .unwrap()
             })
             .unwrap();
@@ -139,19 +131,13 @@ mod tests {
                 return TestResult::discard();
             }
 
-            let mut clocks: HashMap<Actor, Clock<Actor>> = Default::default();
-
             let mut net: Net<TestTree> = Net::new();
             bootstrap_net(&mut net, n_procs);
 
             let actors_loop = net.actors().into_iter().collect::<Vec<_>>().into_iter().cycle();
             for (actor, member) in actors_loop.zip(members.clone().into_iter()) {
-                let clock = clocks
-                    .entry(actor)
-                    .or_insert_with(|| Clock::<Actor>::new(actor, None));
-
                 net.run_packets_to_completion(
-                    net.on_proc(&actor, |p| p.exec_op(p.dt.opmove(clock.tick(), root_id, member.to_string(), member)).unwrap()).unwrap()
+                    net.on_proc(&actor, |p| p.exec_op(p.dt.opmove(root_id, member.to_string(), member)).unwrap()).unwrap()
                 )
             }
 
@@ -194,28 +180,23 @@ mod tests {
 
             // Model testing against the HashSet
             let mut model: Tree<u8, String> = Tree::new();
-            let mut clocks: HashMap<Actor, Clock<Actor>> = Default::default();
 
             let actors_loop = net.actors().into_iter().collect::<Vec<_>>().into_iter().cycle();
             for (actor, member) in actors_loop.zip(members.into_iter()) {
-                let clock = clocks
-                    .entry(actor)
-                    .or_insert_with(|| Clock::<Actor>::new(actor, None));
-
                 model.add_node(member, TreeNode::new(root_id, member.to_string()));
                 net.run_packets_to_completion(
-                    net.on_proc(&actor, |p| p.exec_op(p.dt.opmove((*clock).tick(), root_id, member.to_string(), member)).unwrap()).unwrap()
+                    net.on_proc(&actor, |p| p.exec_op(p.dt.opmove(root_id, member.to_string(), member)).unwrap()).unwrap()
                 )
             }
 
             assert!(net.members_are_in_agreement());
 
-            let treestate: State<_, _, _> = net.on_proc(
+            let treereplica: TreeReplica<_, _, _> = net.on_proc(
                 &net.actors().into_iter().next().unwrap(),
-                |p| p.dt.treestate().clone()
+                |p| p.dt.treereplica().clone()
             ).unwrap();
 
-            assert_eq!(model, *treestate.tree());
+            assert_eq!(model, *treereplica.tree());
 
             TestResult::passed()
         }
@@ -232,9 +213,7 @@ mod tests {
             net.on_proc_mut(&genesis_actor, |p| p.force_join(genesis_actor)).unwrap();
 
             let mut packet_queues: BTreeMap<(Actor, Actor), Vec<Packet<_, _, _>>> = Default::default();
-            let mut model: State<u8, String, Actor> = Default::default();
-            let mut clocks_model: HashMap<Actor, Clock<Actor>> = Default::default();
-            let mut clocks_net: HashMap<Actor, Clock<Actor>> = Default::default();
+            let mut model: TreeReplica<u8, String, Actor> = TreeReplica::new(genesis_actor);
 
             let root_id = 0;
 
@@ -302,17 +281,10 @@ mod tests {
                         if blocked.contains(&actor) {continue};
                         blocked.insert(actor);
 
-                        let clock_model = clocks_model
-                            .entry(actor)
-                            .or_insert_with(|| Clock::<Actor>::new(actor, None));
-                        let clock_net = clocks_net
-                            .entry(actor)
-                            .or_insert_with(|| Clock::<Actor>::new(actor, None));
-
-                        let op = OpMove::new((*clock_model).tick(), 0, v.to_string(), v);
+                        let op = model.opmove(0, v.to_string(), v);
                         model.apply_op(op);
 
-                        for packet in net.on_proc(&actor, |p| p.exec_op(p.dt.opmove((*clock_net).tick(), root_id, v.to_string(), v)).unwrap()).unwrap() {
+                        for packet in net.on_proc(&actor, |p| p.exec_op(p.dt.opmove(root_id, v.to_string(), v)).unwrap()).unwrap() {
                             for resp_packet in net.deliver_packet(packet) {
                                 let queue = (resp_packet.source, resp_packet.dest);
                                 packet_queues
@@ -351,7 +323,7 @@ mod tests {
 
             assert_eq!(
                 net.on_proc(&genesis_actor, |p| {
-                    p.dt.treestate().clone()
+                    p.dt.treereplica().clone()
                 }),
                 Some(model)
             );
