@@ -1,6 +1,6 @@
 [package]
 name = "brb_dt_tree"
-version = "1.1.2"
+version = "1.1.3"
 description = "implements a BRBDataType wrapper around a Tree CRDT"
 authors = [ "dan-da <dan-da@users.noreply.github.com>" ]
 license = "MIT OR BSD-3-Clause"
